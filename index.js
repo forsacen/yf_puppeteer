@@ -1,5 +1,4 @@
 const puppeteer=require('puppeteer')
-const cheerio=require('cheerio')
 const args=[
     //'--disable-setuid-sandbox',
     '--disable-gpu',
@@ -25,9 +24,6 @@ function _request(option,cb){
     }else{
         option.puppeteer.args=args
     }
-    if(option.puppeteer.headless===undefined){
-        option.puppeteer.headless=false
-    }
     if(option.proxy){
         option.puppeteer.args.push('--proxy-server='+option.proxy)
     }
@@ -40,22 +36,28 @@ function _request(option,cb){
     if(option.waitUntil===undefined){
         option.waitUntil='domcontentloaded'
     }
+    if(option.loadStatic===undefined){
+        option.loadStatic=false
+    }
     (async ()=>{
         try{
             var browser=await puppeteer.launch(option.puppeteer)
             var page=await browser.newPage()
             await page.setRequestInterception(true)
-            page.on('request',function(interceptedRequest,option){
-                if (interceptedRequest.url().endsWith('.png') ||
-                    interceptedRequest.url().endsWith('.jpg')||
-                    interceptedRequest.url().endsWith('.ico')||
-                    interceptedRequest.url().endsWith('.mp4')||
-                    interceptedRequest.url().endsWith('.css')||
-                    interceptedRequest.url().endsWith('.gif'))
-                    interceptedRequest.abort()
-                else
-                    interceptedRequest.continue()
-            })
+            if(!option.loadStatic){
+                page.on('request',function(interceptedRequest,option){
+                    if (interceptedRequest.url().endsWith('.png') ||
+                        interceptedRequest.url().endsWith('.jpg')||
+                        interceptedRequest.url().endsWith('.jpeg')||
+                        interceptedRequest.url().endsWith('.ico')||
+                        interceptedRequest.url().endsWith('.mp4')||
+                        interceptedRequest.url().endsWith('.css')||
+                        interceptedRequest.url().endsWith('.gif'))
+                        interceptedRequest.abort()
+                    else
+                        interceptedRequest.continue()
+                })
+            }
             if(option.headers){
                 await page.setExtraHTTPHeaders(option.headers)
             }
@@ -76,11 +78,7 @@ function _request(option,cb){
             }
             if(cb && typeof cb=='function'){
                 let res={}
-                if(option.charset==='utf-8'){
-                    res.$=cheerio.load(content,{decodeEntities: false})
-                }else{
-                    res.$=cheerio.load(iconv.decode(content,option.charset),{decodeEntities: false})
-                }
+                res.body=Buffer.from(content)
                 res.options=option
                 cb(null,res)
             }
